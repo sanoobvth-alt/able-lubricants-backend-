@@ -1,0 +1,232 @@
+// Phase 1 proposal. Confirm open business rules in PROJECT_PHASE_1.md before
+// treating this as the production schema or creating the first migration.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  ADMIN
+  STAFF
+}
+
+enum SaleStatus {
+  DRAFT
+  POSTED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+}
+
+enum PaymentMethod {
+  CASH
+  UPI
+}
+
+enum PurchaseStatus {
+  DRAFT
+  POSTED
+  CANCELLED
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         UserRole @default(STAFF)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model Product {
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String
+  sku          String?  @unique
+  unit         String
+  sellingPrice Decimal  @map("selling_price") @db.Decimal(12, 2)
+  mrp          Decimal? @db.Decimal(12, 2)
+  currentStock Decimal  @default(0) @map("current_stock") @db.Decimal(12, 3)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  saleItems     SaleItem[]
+  purchaseItems PurchaseItem[]
+
+  @@index([name])
+  @@map("products")
+}
+
+model Customer {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  phone     String?
+  address   String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  sales    Sale[]
+  payments CustomerPayment[]
+
+  @@index([name])
+  @@index([phone])
+  @@map("customers")
+}
+
+model Supplier {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  phone     String?
+  address   String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  purchases Purchase[]
+  payments  SupplierPayment[]
+
+  @@index([name])
+  @@index([phone])
+  @@map("suppliers")
+}
+
+model Sale {
+  id             String        @id @default(uuid()) @db.Uuid
+  invoiceNumber  String        @unique @map("invoice_number")
+  idempotencyKey String?       @unique @map("idempotency_key")
+  customerId     String?       @map("customer_id") @db.Uuid
+  customer       Customer?     @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  billDate       DateTime      @map("bill_date") @db.Timestamptz(3)
+  subtotal       Decimal       @db.Decimal(12, 2)
+  discountAmount Decimal      @default(0) @map("discount_amount") @db.Decimal(12, 2)
+  totalAmount    Decimal       @map("total_amount") @db.Decimal(12, 2)
+  status         SaleStatus    @default(DRAFT)
+  paymentStatus  PaymentStatus @default(UNPAID) @map("payment_status")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  items    SaleItem[]
+  payments CustomerPayment[]
+
+  @@index([customerId, billDate])
+  @@index([status, billDate])
+  @@map("sales")
+}
+
+model SaleItem {
+  id                   String  @id @default(uuid()) @db.Uuid
+  saleId               String  @map("sale_id") @db.Uuid
+  sale                 Sale    @relation(fields: [saleId], references: [id], onDelete: Restrict)
+  productId            String  @map("product_id") @db.Uuid
+  product              Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  quantity             Decimal @db.Decimal(12, 3)
+  unitSellingPrice     Decimal @map("unit_selling_price") @db.Decimal(12, 2)
+  discountAmount       Decimal @default(0) @map("discount_amount") @db.Decimal(12, 2)
+  lineTotal             Decimal @map("line_total") @db.Decimal(12, 2)
+  historicalCostSnapshot Decimal? @map("historical_cost_snapshot") @db.Decimal(12, 2)
+
+  @@index([saleId])
+  @@index([productId])
+  @@map("sale_items")
+}
+
+model CustomerPayment {
+  id          String        @id @default(uuid()) @db.Uuid
+  customerId  String?       @map("customer_id") @db.Uuid
+  customer    Customer?     @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  saleId      String?       @map("sale_id") @db.Uuid
+  sale        Sale?         @relation(fields: [saleId], references: [id], onDelete: Restrict)
+  amount      Decimal       @db.Decimal(12, 2)
+  paymentDate DateTime      @map("payment_date") @db.Timestamptz(3)
+  method      PaymentMethod
+  notes       String?
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  @@index([customerId, paymentDate])
+  @@index([saleId])
+  @@map("customer_payments")
+}
+
+model Purchase {
+  id                   String         @id @default(uuid()) @db.Uuid
+  purchaseNumber       String         @unique @map("purchase_number")
+  idempotencyKey       String?        @unique @map("idempotency_key")
+  supplierId           String         @map("supplier_id") @db.Uuid
+  supplier             Supplier       @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  supplierInvoiceNumber String?       @map("supplier_invoice_number")
+  purchaseDate         DateTime       @map("purchase_date") @db.Timestamptz(3)
+  subtotal             Decimal        @db.Decimal(12, 2)
+  discountAmount       Decimal        @default(0) @map("discount_amount") @db.Decimal(12, 2)
+  totalAmount          Decimal        @map("total_amount") @db.Decimal(12, 2)
+  status               PurchaseStatus @default(DRAFT)
+  createdAt            DateTime       @default(now()) @map("created_at")
+  updatedAt            DateTime       @updatedAt @map("updated_at")
+
+  items    PurchaseItem[]
+  payments SupplierPayment[]
+
+  @@index([supplierId, purchaseDate])
+  @@index([status, purchaseDate])
+  @@map("purchases")
+}
+
+model PurchaseItem {
+  id           String  @id @default(uuid()) @db.Uuid
+  purchaseId   String  @map("purchase_id") @db.Uuid
+  purchase     Purchase @relation(fields: [purchaseId], references: [id], onDelete: Restrict)
+  productId    String  @map("product_id") @db.Uuid
+  product      Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  quantity     Decimal @db.Decimal(12, 3)
+  supplierRate Decimal @map("supplier_rate") @db.Decimal(12, 2)
+  lineTotal    Decimal @map("line_total") @db.Decimal(12, 2)
+
+  @@index([purchaseId])
+  @@index([productId])
+  @@map("purchase_items")
+}
+
+model SupplierPayment {
+  id          String        @id @default(uuid()) @db.Uuid
+  supplierId  String        @map("supplier_id") @db.Uuid
+  supplier    Supplier      @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  purchaseId  String?       @map("purchase_id") @db.Uuid
+  purchase    Purchase?     @relation(fields: [purchaseId], references: [id], onDelete: Restrict)
+  amount      Decimal       @db.Decimal(12, 2)
+  paymentDate DateTime      @map("payment_date") @db.Timestamptz(3)
+  method      PaymentMethod
+  notes       String?
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  @@index([supplierId, paymentDate])
+  @@index([purchaseId])
+  @@map("supplier_payments")
+}
+
+model Expense {
+  id            String        @id @default(uuid()) @db.Uuid
+  description   String
+  category      String
+  amount        Decimal       @db.Decimal(12, 2)
+  expenseDate   DateTime      @map("expense_date") @db.Timestamptz(3)
+  paymentMethod PaymentMethod? @map("payment_method")
+  notes         String?
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  @@index([expenseDate, category])
+  @@map("expenses")
+}

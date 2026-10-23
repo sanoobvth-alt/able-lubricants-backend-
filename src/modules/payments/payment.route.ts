@@ -1,0 +1,10 @@
+import { Router } from "express";
+import * as c from "./payment.controller.js";
+import { customerPaymentSchema, supplierPaymentSchema } from "./payment.schema.js";
+import { validate } from "../../shared/validate.js";
+import { authenticate } from "../../middlewares/auth.js";
+const router = Router();
+router.use(authenticate);
+router.post("/customer-payments", validate("body", customerPaymentSchema), c.customerPayment);
+router.post("/supplier-payments", validate("body", supplierPaymentSchema), c.supplierPayment);
+export default router;
