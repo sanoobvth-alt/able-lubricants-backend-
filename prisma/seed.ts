@@ -1,19 +1,34 @@
 import "dotenv/config";
 import bcrypt from "bcryptjs";
-import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient } from "../generated/prisma/client.js";
-import { env } from "../src/config/env.js";
+import prisma from "../src/config/prisma.js";
 
-if (!env.ADMIN_PASSWORD) throw new Error("Set ADMIN_PASSWORD before running the seed script.");
-const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: env.DATABASE_URL }) });
 try {
-  const passwordHash = await bcrypt.hash(env.ADMIN_PASSWORD, 12);
+  if (!process.env.ADMIN_EMAIL || !process.env.ADMIN_PASSWORD) {
+    throw new Error(
+      "ADMIN_EMAIL and ADMIN_PASSWORD are required to seed the initial admin",
+    );
+  }
+
+  const email = process.env.ADMIN_EMAIL.toLowerCase();
+  const passwordHash = await bcrypt.hash(
+    process.env.ADMIN_PASSWORD,
+    12,
+  );
+
   await prisma.user.upsert({
-    where: { email: env.ADMIN_EMAIL.toLowerCase() },
-    update: { name: env.ADMIN_NAME, passwordHash, role: "ADMIN", active: true },
-    create: { name: env.ADMIN_NAME, email: env.ADMIN_EMAIL.toLowerCase(), passwordHash, role: "ADMIN" },
+    where: { email },
+    update: {
+      role: "ADMIN",
+    },
+    create: {
+      name: process.env.ADMIN_NAME || "System Administrator",
+      email,
+      passwordHash,
+      role: "ADMIN",
+    },
   });
-  console.log(`Admin account ready: ${env.ADMIN_EMAIL}`);
+
+  console.info(`Initial admin ensured for ${email}`);
 } finally {
   await prisma.$disconnect();
 }
