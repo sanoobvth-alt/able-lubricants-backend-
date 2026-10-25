@@ -1,1 +1,4 @@
-export const expenseSerializer = (expense: any) => ({ ...expense, amount: expense.amount.toString() });
+export const expenseSerializer = (expense: any) => ({
+  ...expense,
+  amount: expense.amount.toString(),
+});

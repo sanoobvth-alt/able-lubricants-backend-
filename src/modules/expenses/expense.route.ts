@@ -1,10 +1,21 @@
 import { Router } from "express";
 import * as c from "./expense.controller.js";
-import { createExpenseSchema, expenseIdSchema, expenseListSchema, updateExpenseSchema } from "./expense.schema.js";
+import {
+  createExpenseSchema,
+  expenseIdSchema,
+  expenseListSchema,
+  updateExpenseSchema,
+} from "./expense.schema.js";
 import { validate } from "../../shared/validate.js";
 import { authenticate } from "../../middlewares/auth.js";
-const router = Router(); router.use(authenticate);
+const router = Router();
+router.use(authenticate);
 router.get("/", validate("query", expenseListSchema), c.list);
 router.post("/", validate("body", createExpenseSchema), c.create);
-router.patch("/:id", validate("params", expenseIdSchema), validate("body", updateExpenseSchema), c.update);
+router.patch(
+  "/:id",
+  validate("params", expenseIdSchema),
+  validate("body", updateExpenseSchema),
+  c.update,
+);
 export default router;

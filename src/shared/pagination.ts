@@ -6,4 +6,9 @@ export const paginationSchema = z.object({
   search: z.string().trim().optional(),
 });
 
-export const pageMeta = (page: number, limit: number, total: number) => ({ page, limit, total, totalPages: Math.ceil(total / limit) });
+export const pageMeta = (page: number, limit: number, total: number) => ({
+  page,
+  limit,
+  total,
+  totalPages: Math.ceil(total / limit),
+});

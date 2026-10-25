@@ -75,3 +75,7 @@ These rules are documented defaults, not assumptions about tax or profit account
 ## Verification
 
 Run `npm test` for focused tests around decimal line/invoice calculations and stock comparison. Run `npm run build` for TypeScript compilation. API/database integration scenarios require a configured PostgreSQL database and should be verified against the local database before deployment.
+
+## Postman smoke tests
+
+Import `postman/Able-Lubes-API.postman_collection.json` into Postman. Set its `adminPassword` collection variable to the same value as `ADMIN_PASSWORD` in `.env`, run `npm run db:seed`, start the API, and run the collection from top to bottom with Collection Runner. It covers every current API route, including GET/POST/PATCH for CRUD-capable resources, invoice/payment flows, cancellation, and reports. It creates dummy customer, supplier, product, purchase, sale, payment, and expense data; it also checks idempotent retries and oversell rejection. Product/customer/supplier delete behavior is tested as soft deactivation with `PATCH active=false`. The API does not expose hard DELETE or PUT, nor sale/purchase reads or expense detail. Running the collection more than once creates additional dummy records.

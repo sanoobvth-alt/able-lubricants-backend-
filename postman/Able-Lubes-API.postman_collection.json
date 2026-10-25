@@ -1,0 +1,1241 @@
+{
+  "info": {
+    "_postman_id": "a8ad0e1c-8ec8-49ad-a313-72c9a89d4b50",
+    "name": "Able Lubes Inventory & Billing API",
+    "description": "Postman collection generated from the actual Express route definitions in src/routes/v1.ts and each module route file. Includes every currently implemented endpoint and sample CRUD requests where supported. It explicitly documents unavailable hard-delete, PUT, and financial-record CRUD routes instead of sending requests that the API cannot handle. Set adminPassword to ADMIN_PASSWORD from .env; seed the admin, start the API, then run folders in order.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "adminEmail",
+      "value": "admin@example.com",
+      "type": "string"
+    },
+    {
+      "key": "adminPassword",
+      "value": "change-this-before-seeding",
+      "type": "string",
+      "description": "Dummy local value only. Replace with ADMIN_PASSWORD from your .env before running login."
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "customerId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "supplierId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "productId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "purchaseId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "saleId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "unpaidSaleId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "purchaseKey",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "saleKey",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "runTag",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "reportFrom",
+      "value": "2026-01-01T00:00:00.000Z",
+      "type": "string"
+    },
+    {
+      "key": "reportTo",
+      "value": "2027-01-01T00:00:00.000Z",
+      "type": "string"
+    },
+    {
+      "key": "staffEmail",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "expenseId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "unpaidPurchaseId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "unpaidPurchaseKey",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "healthUrl",
+      "value": "http://localhost:3000/health",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Health",
+      "description": "Public GET /health route.",
+      "item": [
+        {
+          "name": "API health check",
+          "request": {
+            "method": "GET",
+            "url": "{{healthUrl}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('API health check', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1. Authentication",
+      "description": "POST login and admin-only POST staff-user creation. Login saves the bearer token for later requests.",
+      "item": [
+        {
+          "name": "Login as seeded admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Login succeeds', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Token is returned', function () { pm.expect(body.data.token).to.be.a('string').and.not.empty; });",
+                  "pm.collectionVariables.set('token', body.data.token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/auth/login"
+          }
+        },
+        {
+          "name": "Create staff user (admin only)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/auth/users",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman Dummy Staff\",\n  \"email\": \"{{staffEmail}}\",\n  \"password\": \"DummyStaffPass123!\",\n  \"role\": \"STAFF\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('staffEmail', 'postman.staff.' + Date.now() + '@example.test');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Admin creates a staff user', function () { pm.response.to.have.status(201); pm.expect(pm.response.json().data.role).to.eql('STAFF'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Customers — CRUD",
+      "description": "Create: POST /customers. Read: GET list and GET by ID. Update: PATCH by ID. Deactivate: PATCH active=false (soft deactivation). No hard DELETE or PUT route exists.",
+      "item": [
+        {
+          "name": "Create customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Customer created', function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set('customerId', pm.response.json().data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Anu Auto Works\",\n  \"phone\": \"9876501234\",\n  \"address\": \"MG Road, Kochi\",\n  \"active\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/customers"
+          }
+        },
+        {
+          "name": "List customers",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/customers?page=1&limit=20&search=Anu"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Customer list returns 200 and pagination metadata', function () { pm.response.to.have.status(200); pm.expect(pm.response.json().meta.total).to.be.a('number'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get created customer",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/customers/{{customerId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Customer detail matches the created record', function () { pm.response.to.have.status(200); pm.expect(pm.response.json().data.id).to.eql(pm.collectionVariables.get('customerId')); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update customer (PATCH)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/customers/{{customerId}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"9876501235\",\n  \"address\": \"Updated dummy address, Kochi\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Customer updated', function () { pm.response.to.have.status(200); pm.expect(pm.response.json().data.phone).to.eql('9876501235'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Suppliers — CRUD",
+      "description": "Create: POST /suppliers. Read: GET list and GET by ID. Update: PATCH by ID. Deactivate: PATCH active=false (soft deactivation). No hard DELETE or PUT route exists.",
+      "item": [
+        {
+          "name": "Create supplier",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Supplier created', function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set('supplierId', pm.response.json().data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Coastal Lubricants Supply\",\n  \"phone\": \"9847001122\",\n  \"address\": \"Industrial Estate, Ernakulam\",\n  \"active\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/suppliers"
+          }
+        },
+        {
+          "name": "List suppliers",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/suppliers?page=1&limit=20&search=Coastal"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Supplier list returns 200 and pagination metadata', function () { pm.response.to.have.status(200); pm.expect(pm.response.json().meta.total).to.be.a('number'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get created supplier",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/suppliers/{{supplierId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Supplier detail matches the created record', function () { pm.response.to.have.status(200); pm.expect(pm.response.json().data.id).to.eql(pm.collectionVariables.get('supplierId')); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update supplier (PATCH)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/suppliers/{{supplierId}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"address\": \"Updated dummy supplier address\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Supplier updated', function () { pm.response.to.have.status(200); pm.expect(pm.response.json().data.address).to.eql('Updated dummy supplier address'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Products — CRUD",
+      "description": "Create: POST /products. Read: GET list and GET by ID. Update: PATCH by ID. Deactivate: PATCH active=false (soft deactivation). Stock cannot be edited directly. No hard DELETE or PUT route exists.",
+      "item": [
+        {
+          "name": "Create product",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('runTag', Date.now().toString());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Product created with zero initial stock', function () { pm.response.to.have.status(201); pm.expect(pm.response.json().data.currentStock).to.eql('0'); });",
+                  "pm.collectionVariables.set('productId', pm.response.json().data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Dummy Engine Oil 5W-30\",\n  \"sku\": \"ABLE-5W30-{{runTag}}\",\n  \"unit\": \"L\",\n  \"sellingPrice\": 750,\n  \"mrp\": 850,\n  \"active\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/products"
+          }
+        },
+        {
+          "name": "List products",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Product list returns 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('List has pagination metadata', function () { pm.expect(pm.response.json().meta.total).to.be.a('number'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/products?page=1&limit=20&search=Dummy"
+          }
+        },
+        {
+          "name": "Get created product",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/products/{{productId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Product detail matches the created record', function () { pm.response.to.have.status(200); pm.expect(pm.response.json().data.id).to.eql(pm.collectionVariables.get('productId')); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update product MRP (PATCH)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/products/{{productId}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mrp\": 875\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Product updated without overwriting stock', function () { pm.response.to.have.status(200); pm.expect(pm.response.json().data.mrp).to.eql('875'); pm.expect(pm.response.json().data.currentStock).to.eql('0'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Purchases",
+      "description": "POST creates/posts purchases and idempotent retry returns the original. POST /:id/cancel reverses stock for unpaid purchases. No purchase read or update route exists.",
+      "item": [
+        {
+          "name": "Post purchase (adds 100 L to stock)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('purchaseKey', 'postman-purchase-' + Date.now());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Purchase posted', function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set('purchaseId', pm.response.json().data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idempotencyKey\": \"{{purchaseKey}}\",\n  \"supplierId\": \"{{supplierId}}\",\n  \"supplierInvoiceNumber\": \"SUP-DUMMY-001\",\n  \"discountAmount\": 0,\n  \"items\": [\n    { \"productId\": \"{{productId}}\", \"quantity\": 100, \"supplierRate\": 600 }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/purchases"
+          }
+        },
+        {
+          "name": "Repeat purchase with the same idempotency key (must not add stock twice)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Idempotent retry returns the original purchase', function () { pm.response.to.have.status(201); pm.expect(pm.response.json().data.id).to.eql(pm.collectionVariables.get('purchaseId')); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idempotencyKey\": \"{{purchaseKey}}\",\n  \"supplierId\": \"{{supplierId}}\",\n  \"supplierInvoiceNumber\": \"SUP-DUMMY-001\",\n  \"discountAmount\": 0,\n  \"items\": [\n    { \"productId\": \"{{productId}}\", \"quantity\": 100, \"supplierRate\": 600 }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/purchases"
+          }
+        },
+        {
+          "name": "Create an unpaid purchase for cancellation test",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/purchases",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idempotencyKey\": \"{{unpaidPurchaseKey}}\",\n  \"supplierId\": \"{{supplierId}}\",\n  \"supplierInvoiceNumber\": \"SUP-DUMMY-CANCEL\",\n  \"discountAmount\": 0,\n  \"items\": [\n    {\n      \"productId\": \"{{productId}}\",\n      \"quantity\": 5,\n      \"supplierRate\": 600\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('unpaidPurchaseKey', 'postman-cancel-purchase-' + Date.now());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Unpaid purchase posted', function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set('unpaidPurchaseId', pm.response.json().data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cancel unpaid purchase (reverses its stock once)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/purchases/{{unpaidPurchaseId}}/cancel"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Unpaid purchase cancelled', function () { pm.response.to.have.status(200); pm.expect(pm.response.json().data.status).to.eql('CANCELLED'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6. Sales",
+      "description": "POST creates/posts sales and idempotent retry returns the original. POST /:id/cancel reverses stock for unpaid sales. Includes oversell rejection. No sale read or update route exists.",
+      "item": [
+        {
+          "name": "Reject a sale larger than available stock",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Oversell is rejected with 409', function () { pm.response.to.have.status(409); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idempotencyKey\": \"oversell-{{$timestamp}}\",\n  \"customerId\": \"{{customerId}}\",\n  \"items\": [\n    { \"productId\": \"{{productId}}\", \"quantity\": 999999, \"discountAmount\": 0 }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/sales"
+          }
+        },
+        {
+          "name": "Post a credit sale (2 L with a 25 discount)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('saleKey', 'postman-sale-' + Date.now());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Sale posted with server-calculated total', function () { pm.response.to.have.status(201); pm.expect(pm.response.json().data.totalAmount).to.eql('1475'); });",
+                  "pm.collectionVariables.set('saleId', pm.response.json().data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idempotencyKey\": \"{{saleKey}}\",\n  \"customerId\": \"{{customerId}}\",\n  \"discountAmount\": 0,\n  \"items\": [\n    { \"productId\": \"{{productId}}\", \"quantity\": 2, \"discountAmount\": 25 }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/sales"
+          }
+        },
+        {
+          "name": "Repeat sale with the same idempotency key (must not deduct stock twice)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Idempotent retry returns the original sale', function () { pm.response.to.have.status(201); pm.expect(pm.response.json().data.id).to.eql(pm.collectionVariables.get('saleId')); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idempotencyKey\": \"{{saleKey}}\",\n  \"customerId\": \"{{customerId}}\",\n  \"discountAmount\": 0,\n  \"items\": [\n    { \"productId\": \"{{productId}}\", \"quantity\": 2, \"discountAmount\": 25 }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/sales"
+          }
+        },
+        {
+          "name": "Post an unpaid walk-in sale for cancellation test",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('unpaidSaleKey', 'postman-cancel-sale-' + Date.now());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Unpaid sale posted', function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set('unpaidSaleId', pm.response.json().data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idempotencyKey\": \"{{unpaidSaleKey}}\",\n  \"items\": [\n    { \"productId\": \"{{productId}}\", \"quantity\": 1, \"discountAmount\": 0 }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/sales"
+          }
+        },
+        {
+          "name": "Cancel unpaid sale (restores stock once)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Unpaid sale cancelled', function () { pm.response.to.have.status(200); pm.expect(pm.response.json().data.status).to.eql('CANCELLED'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/sales/{{unpaidSaleId}}/cancel"
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Payments",
+      "description": "POST customer/supplier payments against one invoice. No payment read, update, or delete route exists.",
+      "item": [
+        {
+          "name": "Record supplier payment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Supplier payment recorded', function () { pm.response.to.have.status(201); pm.expect(pm.response.json().data.amount).to.eql('5000'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"supplierId\": \"{{supplierId}}\",\n  \"purchaseId\": \"{{purchaseId}}\",\n  \"amount\": 5000,\n  \"method\": \"UPI\",\n  \"notes\": \"Dummy partial supplier payment\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/supplier-payments"
+          }
+        },
+        {
+          "name": "Record partial customer payment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Partial payment recorded', function () { pm.response.to.have.status(201); pm.expect(pm.response.json().data.amount).to.eql('500'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"{{customerId}}\",\n  \"saleId\": \"{{saleId}}\",\n  \"amount\": 500,\n  \"method\": \"CASH\",\n  \"notes\": \"Dummy partial payment\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/customer-payments"
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Inventory verification",
+      "description": "Checks stock after purchase and rejected oversell.",
+      "item": [
+        {
+          "name": "Get product stock after purchase and rejected oversell",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Stock remains 100 after failed oversell', function () { pm.response.to.have.status(200); pm.expect(pm.response.json().data.currentStock).to.eql('100'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/products/{{productId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Expenses — available CRUD",
+      "description": "Create: POST /expenses. Read: GET list. Update: PATCH by ID. No expense detail or delete route exists.",
+      "item": [
+        {
+          "name": "Create shop expense",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expense recorded', function () { pm.response.to.have.status(201); pm.expect(pm.response.json().data.amount).to.eql('850'); });",
+                  "pm.collectionVariables.set('expenseId', pm.response.json().data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Dummy shop electricity bill\",\n  \"category\": \"Utilities\",\n  \"amount\": 850,\n  \"paymentMethod\": \"UPI\",\n  \"notes\": \"Postman sample expense\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/expenses"
+          }
+        },
+        {
+          "name": "List expenses",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/expenses?page=1&limit=20&search=electricity"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expense list returns 200 and pagination metadata', function () { pm.response.to.have.status(200); pm.expect(pm.response.json().meta.total).to.be.a('number'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update shop expense (PATCH)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/expenses/{{expenseId}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 900,\n  \"notes\": \"Updated dummy electricity bill\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expense updated', function () { pm.response.to.have.status(200); pm.expect(pm.response.json().data.amount).to.eql('900'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "10. Reports",
+      "description": "Read-only GET endpoints for sales, purchases, expenses, customer/supplier outstanding, and monthly summary.",
+      "item": [
+        {
+          "name": "Purchase report",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/reports/purchases?from={{reportFrom}}&to={{reportTo}}"
+          }
+        },
+        {
+          "name": "Daily sales report",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Sales report returned', function () { pm.response.to.have.status(200); pm.expect(pm.response.json().data.days).to.be.an('array'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/reports/sales?from={{reportFrom}}&to={{reportTo}}"
+          }
+        },
+        {
+          "name": "Expense report",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/reports/expenses?from={{reportFrom}}&to={{reportTo}}"
+          }
+        },
+        {
+          "name": "Customer outstanding balances",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/reports/customers/outstanding"
+          }
+        },
+        {
+          "name": "Supplier outstanding balances",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/reports/suppliers/outstanding"
+          }
+        },
+        {
+          "name": "Monthly summary",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/reports/monthly?from={{reportFrom}}&to={{reportTo}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "11. Optional cleanup",
+      "description": "Soft-deactivates the sample product, customer, and supplier. Skip this folder to keep them active.",
+      "item": [
+        {
+          "name": "Deactivate customer (soft delete via PATCH active=false)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/customers/{{customerId}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"active\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Deactivate customer (soft delete via PATCH active=false)', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Deactivate supplier (soft delete via PATCH active=false)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/suppliers/{{supplierId}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"active\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Deactivate supplier (soft delete via PATCH active=false)', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Deactivate product (soft delete via PATCH active=false)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/products/{{productId}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"active\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Deactivate product (soft delete via PATCH active=false)', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
