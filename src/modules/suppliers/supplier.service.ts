@@ -3,14 +3,17 @@ import { pageMeta } from "../../shared/pagination.js";
 import { supplierModel } from "./supplier.model.js";
 import { supplierSerializer } from "./supplier.serializer.js";
 export async function listSuppliers(q: any) {
-  const where = q.search
-    ? {
-        OR: [
-          { name: { contains: q.search, mode: "insensitive" } },
-          { phone: { contains: q.search } },
-        ],
-      }
-    : {};
+  const where = {
+    active: q.active,
+    ...(q.search
+      ? {
+          OR: [
+            { name: { contains: q.search, mode: "insensitive" } },
+            { phone: { contains: q.search } },
+          ],
+        }
+      : {}),
+  };
   const [data, total] = await Promise.all([
     supplierModel.list(where, (q.page - 1) * q.limit, q.limit),
     supplierModel.count(where),

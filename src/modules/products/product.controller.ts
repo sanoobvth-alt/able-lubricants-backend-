@@ -10,7 +10,10 @@ export const get = async (req: Request, res: Response) =>
 export const create = async (req: Request, res: Response) =>
   res
     .status(201)
-    .json({ success: true, data: await service.createProduct(req.body) });
+    .json({
+      success: true,
+      data: await service.createProduct(req.body, req.user!.id),
+    });
 export const update = async (req: Request, res: Response) =>
   res.json({
     success: true,

@@ -6,7 +6,6 @@ const saleLineSchema = z.object({
   discountAmount: z.coerce.number().finite().min(0).default(0),
 });
 export const createSaleSchema = z.object({
-  idempotencyKey: z.string().trim().min(8).max(120),
   customerId: z.uuid().optional().nullable(),
   billDate: z.coerce.date().optional(),
   discountAmount: z.coerce.number().finite().min(0).default(0),

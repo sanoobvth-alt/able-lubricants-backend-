@@ -8,4 +8,9 @@ export const createSupplierSchema = z.object({
   active: z.boolean().optional(),
 });
 export const updateSupplierSchema = createSupplierSchema.partial();
-export const supplierListSchema = paginationSchema;
+export const supplierListSchema = paginationSchema.extend({
+  active: z
+    .enum(["true", "false"])
+    .transform((v) => v === "true")
+    .default(true),
+});

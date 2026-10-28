@@ -4,7 +4,7 @@ export const openApiDocument = {
     title: "Able Lubes Inventory & Billing API",
     version: "1.0.0",
     description:
-      "REST API for a single-shop lubricant inventory and billing backend.",
+      "REST API for a single-shop lubricant inventory and billing backend. List endpoints for products, brands, units, customers, and suppliers default to active=true; pass active=false to list inactive records.",
   },
   servers: [{ url: "/api/v1" }],
   components: {
@@ -39,6 +39,73 @@ export const openApiDocument = {
         summary: "Create product",
         security: [{ bearerAuth: [] }],
         responses: { "201": { description: "Created product" } },
+      },
+    },
+    "/brands": {
+      get: {
+        summary: "List brands",
+        security: [{ bearerAuth: [] }],
+        responses: { "200": { description: "Paginated brands" } },
+      },
+      post: {
+        summary: "Create brand",
+        security: [{ bearerAuth: [] }],
+        responses: { "201": { description: "Created brand" } },
+      },
+    },
+    "/brands/{id}": {
+      get: {
+        summary: "Get brand",
+        security: [{ bearerAuth: [] }],
+        responses: { "200": { description: "Brand" } },
+      },
+      patch: {
+        summary: "Update or deactivate brand",
+        security: [{ bearerAuth: [] }],
+        responses: { "200": { description: "Updated brand" } },
+      },
+    },
+    "/units": {
+      get: {
+        summary: "List units",
+        security: [{ bearerAuth: [] }],
+        responses: { "200": { description: "Paginated units" } },
+      },
+      post: {
+        summary: "Create unit",
+        security: [{ bearerAuth: [] }],
+        responses: { "201": { description: "Created unit" } },
+      },
+    },
+    "/units/{id}": {
+      get: {
+        summary: "Get unit",
+        security: [{ bearerAuth: [] }],
+        responses: { "200": { description: "Unit" } },
+      },
+      patch: {
+        summary: "Update or deactivate unit",
+        security: [{ bearerAuth: [] }],
+        responses: { "200": { description: "Updated unit" } },
+      },
+    },
+    "/stock-adjustments": {
+      get: {
+        summary: "List stock movement history",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          "200": {
+            description: "Paginated movements; optionally filter by productId",
+          },
+        },
+      },
+      post: {
+        summary: "Adjust product stock (admin only)",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          "201": { description: "Stock movement and resulting stock" },
+          "409": { description: "Insufficient or concurrently changed stock" },
+        },
       },
     },
     "/products/{id}": {
@@ -79,8 +146,7 @@ export const openApiDocument = {
     },
     "/sales": {
       post: {
-        summary:
-          "Post sale and deduct inventory; send an Idempotency-Key in the request body",
+        summary: "Post sale and deduct inventory",
         security: [{ bearerAuth: [] }],
         responses: {
           "201": { description: "Posted invoice" },

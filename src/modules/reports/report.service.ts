@@ -79,6 +79,8 @@ export async function customerOutstanding() {
   const balances = new Map<string, any>();
   for (const row of rows) {
     const customer = row.customer!;
+    console.log(customer, "====");
+
     const x = balances.get(customer.id) ?? {
       ...customer,
       invoiced: decimal(0),
@@ -88,12 +90,14 @@ export async function customerOutstanding() {
     x.paid = x.paid.add(sum(row.payments.map((p) => p.amount)));
     balances.set(customer.id, x);
   }
-  return [...balances.values()].map((x) => ({
-    ...x,
-    outstanding: Prisma.Decimal.max(0, x.invoiced.sub(x.paid)).toFixed(2),
-    invoiced: x.invoiced.toFixed(2),
-    paid: x.paid.toFixed(2),
-  }));
+  return [...balances.values()]
+    .filter((x) => x.invoiced.sub(x.paid).gt(0))
+    .map((x) => ({
+      ...x,
+      outstanding: Prisma.Decimal.max(0, x.invoiced.sub(x.paid)).toFixed(2),
+      invoiced: x.invoiced.toFixed(2),
+      paid: x.paid.toFixed(2),
+    }));
 }
 export async function supplierOutstanding() {
   const rows = await reportModel.supplierPurchases();

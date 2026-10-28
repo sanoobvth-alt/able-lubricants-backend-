@@ -3,8 +3,6 @@ import { randomUUID } from "node:crypto";
 import { prisma } from "../../config/prisma.js";
 import { ApiError } from "../../shared/errors.js";
 import { calculateInvoice, calculateLine } from "../../shared/money.js";
-import { saleModel } from "../sales/sale.model.js";
-import { purchaseModel } from "../purchases/purchase.model.js";
 
 const dec = (n: number | string) => new Prisma.Decimal(n);
 function aggregateItems(
@@ -26,195 +24,161 @@ const totalDiscount = (rows: Array<{ discountAmount: number }>) =>
   rows.reduce((total, row) => total.add(dec(row.discountAmount)), dec(0));
 
 export async function createSale(input: any) {
-  const existing = await saleModel.findByIdempotencyKey(input.idempotencyKey);
-  if (existing) return existing;
-  try {
-    return await prisma.$transaction(
-      async (tx) => {
-        const grouped = aggregateItems(input.items);
-        const products = await tx.product.findMany({
-          where: { id: { in: [...grouped.keys()] }, active: true },
-        });
-        if (products.length !== grouped.size)
-          throw new ApiError(
-            400,
-            "One or more products are missing or inactive",
-          );
-        if (
-          input.customerId &&
-          !(await tx.customer.findFirst({
-            where: { id: input.customerId, active: true },
-            select: { id: true },
-          }))
-        )
-          throw new ApiError(400, "Customer is missing or inactive");
-        const productById = new Map(products.map((p) => [p.id, p]));
-        const lines: any[] = [];
-        let subtotal = dec(0);
-        let lineDiscounts = dec(0);
-        for (const [productId, rows] of grouped) {
-          const product = productById.get(productId)!;
-          const quantity = totalQuantity(rows);
-          const discount = totalDiscount(rows);
-          let calculated;
-          try {
-            calculated = calculateLine(
-              product.sellingPrice,
-              quantity,
-              discount,
-            );
-          } catch {
-            throw new ApiError(400, "Line discount cannot exceed line value");
-          }
-          subtotal = subtotal.add(calculated.subtotal);
-          lineDiscounts = lineDiscounts.add(calculated.discountAmount);
-          lines.push({
-            productId,
-            quantity,
-            unitSellingPrice: product.sellingPrice,
-            discountAmount: calculated.discountAmount,
-            lineTotal: calculated.total,
-            historicalCostSnapshot: null,
-          });
-        }
-        const invoiceDiscount = dec(input.discountAmount);
-        let totals;
+  return prisma.$transaction(
+    async (tx) => {
+      const grouped = aggregateItems(input.items);
+      const products = await tx.product.findMany({
+        where: { id: { in: [...grouped.keys()] }, active: true },
+      });
+      if (products.length !== grouped.size)
+        throw new ApiError(400, "One or more products are missing or inactive");
+      if (
+        input.customerId &&
+        !(await tx.customer.findFirst({
+          where: { id: input.customerId, active: true },
+          select: { id: true },
+        }))
+      )
+        throw new ApiError(400, "Customer is missing or inactive");
+      const productById = new Map(products.map((p) => [p.id, p]));
+      const lines: any[] = [];
+      let subtotal = dec(0);
+      let lineDiscounts = dec(0);
+      for (const [productId, rows] of grouped) {
+        const product = productById.get(productId)!;
+        const quantity = totalQuantity(rows);
+        const discount = totalDiscount(rows);
+        let calculated;
         try {
-          totals = calculateInvoice(subtotal, lineDiscounts, invoiceDiscount);
+          calculated = calculateLine(product.sellingPrice, quantity, discount);
         } catch {
-          throw new ApiError(
-            400,
-            "Invoice discount cannot exceed the remaining subtotal",
-          );
+          throw new ApiError(400, "Line discount cannot exceed line value");
         }
-        // Conditional decrement is atomic at the row level and prevents concurrent overselling.
-        for (const [productId, rows] of grouped) {
-          const quantity = totalQuantity(rows);
-          const changed = await tx.product.updateMany({
-            where: {
-              id: productId,
-              active: true,
-              currentStock: { gte: quantity },
-            },
-            data: { currentStock: { decrement: quantity } },
-          });
-          if (changed.count !== 1)
-            throw new ApiError(
-              409,
-              `Insufficient stock for product ${productById.get(productId)!.name}`,
-            );
-        }
-        return tx.sale.create({
-          data: {
-            invoiceNumber: `AL-${Date.now()}-${randomUUID().slice(0, 8).toUpperCase()}`,
-            idempotencyKey: input.idempotencyKey,
-            customerId: input.customerId ?? null,
-            billDate: input.billDate ?? new Date(),
-            subtotal: totals.subtotal,
-            discountAmount: totals.discountAmount,
-            totalAmount: totals.total,
-            status: "POSTED",
-            paymentStatus: "UNPAID",
-            items: { create: lines },
-          },
-          include: { items: true, payments: true },
+        subtotal = subtotal.add(calculated.subtotal);
+        lineDiscounts = lineDiscounts.add(calculated.discountAmount);
+        lines.push({
+          productId,
+          quantity,
+          unitSellingPrice: product.sellingPrice,
+          discountAmount: calculated.discountAmount,
+          lineTotal: calculated.total,
+          historicalCostSnapshot: null,
         });
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-    );
-  } catch (error) {
-    if (input.idempotencyKey) {
-      const duplicate = await saleModel.findByIdempotencyKey(
-        input.idempotencyKey,
-      );
-      if (duplicate) return duplicate;
-    }
-    throw error;
-  }
+      }
+      const invoiceDiscount = dec(input.discountAmount);
+      let totals;
+      try {
+        totals = calculateInvoice(subtotal, lineDiscounts, invoiceDiscount);
+      } catch {
+        throw new ApiError(
+          400,
+          "Invoice discount cannot exceed the remaining subtotal",
+        );
+      }
+      // Conditional decrement is atomic at the row level and prevents concurrent overselling.
+      for (const [productId, rows] of grouped) {
+        const quantity = totalQuantity(rows);
+        const changed = await tx.product.updateMany({
+          where: {
+            id: productId,
+            active: true,
+            currentStock: { gte: quantity },
+          },
+          data: { currentStock: { decrement: quantity } },
+        });
+        if (changed.count !== 1)
+          throw new ApiError(
+            409,
+            `Insufficient stock for product ${productById.get(productId)!.name}`,
+          );
+      }
+      return tx.sale.create({
+        data: {
+          invoiceNumber: `AL-${Date.now()}-${randomUUID().slice(0, 8).toUpperCase()}`,
+          customerId: input.customerId ?? null,
+          billDate: input.billDate ?? new Date(),
+          subtotal: totals.subtotal,
+          discountAmount: totals.discountAmount,
+          totalAmount: totals.total,
+          status: "POSTED",
+          paymentStatus: "UNPAID",
+          items: { create: lines },
+        },
+        include: { items: true, payments: true },
+      });
+    },
+    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+  );
 }
 
 export async function createPurchase(input: any) {
-  const existing = await purchaseModel.findByIdempotencyKey(
-    input.idempotencyKey,
-  );
-  if (existing) return existing;
-  try {
-    return await prisma.$transaction(
-      async (tx) => {
-        const grouped = aggregateItems(input.items);
-        const products = await tx.product.findMany({
-          where: { id: { in: [...grouped.keys()] }, active: true },
-        });
-        if (products.length !== grouped.size)
+  return prisma.$transaction(
+    async (tx) => {
+      const grouped = aggregateItems(input.items);
+      console.log(grouped);
+
+      const products = await tx.product.findMany({
+        where: { id: { in: [...grouped.keys()] }, active: true },
+      });
+      if (products.length !== grouped.size)
+        throw new ApiError(400, "One or more products are missing or inactive");
+      if (
+        !(await tx.supplier.findFirst({
+          where: { id: input.supplierId, active: true },
+          select: { id: true },
+        }))
+      )
+        throw new ApiError(400, "Supplier is missing or inactive");
+      const lines: any[] = [];
+      let subtotal = dec(0);
+      for (const [productId, rows] of grouped) {
+        const rate = dec(rows[0].supplierRate!);
+        if (rows.some((r) => !dec(r.supplierRate!).eq(rate)))
           throw new ApiError(
             400,
-            "One or more products are missing or inactive",
+            "Combine duplicate product lines with the same supplier rate",
           );
-        if (
-          !(await tx.supplier.findFirst({
-            where: { id: input.supplierId, active: true },
-            select: { id: true },
-          }))
-        )
-          throw new ApiError(400, "Supplier is missing or inactive");
-        const lines: any[] = [];
-        let subtotal = dec(0);
-        for (const [productId, rows] of grouped) {
-          const rate = dec(rows[0].supplierRate!);
-          if (rows.some((r) => !dec(r.supplierRate!).eq(rate)))
-            throw new ApiError(
-              400,
-              "Combine duplicate product lines with the same supplier rate",
-            );
-          const quantity = totalQuantity(rows);
-          const calculated = calculateLine(rate, quantity);
-          subtotal = subtotal.add(calculated.subtotal);
-          lines.push({
-            productId,
-            quantity,
-            supplierRate: rate,
-            lineTotal: calculated.total,
-          });
-        }
-        const invoiceDiscount = dec(input.discountAmount);
-        let totals;
-        try {
-          totals = calculateInvoice(subtotal, 0, invoiceDiscount);
-        } catch {
-          throw new ApiError(400, "Purchase discount cannot exceed subtotal");
-        }
-        for (const [productId, rows] of grouped) {
-          const quantity = totalQuantity(rows);
-          await tx.product.update({
-            where: { id: productId },
-            data: { currentStock: { increment: quantity } },
-          });
-        }
-        return tx.purchase.create({
-          data: {
-            purchaseNumber: `PUR-${Date.now()}-${randomUUID().slice(0, 8).toUpperCase()}`,
-            idempotencyKey: input.idempotencyKey,
-            supplierId: input.supplierId,
-            supplierInvoiceNumber: input.supplierInvoiceNumber,
-            purchaseDate: input.purchaseDate ?? new Date(),
-            subtotal: totals.subtotal,
-            discountAmount: totals.discountAmount,
-            totalAmount: totals.total,
-            status: "POSTED",
-            items: { create: lines },
-          },
-          include: { items: true, payments: true },
+        const quantity = totalQuantity(rows);
+        const calculated = calculateLine(rate, quantity);
+        subtotal = subtotal.add(calculated.subtotal);
+        lines.push({
+          productId,
+          quantity,
+          supplierRate: rate,
+          lineTotal: calculated.total,
         });
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-    );
-  } catch (error) {
-    const duplicate = await purchaseModel.findByIdempotencyKey(
-      input.idempotencyKey,
-    );
-    if (duplicate) return duplicate;
-    throw error;
-  }
+      }
+      const invoiceDiscount = dec(input.discountAmount);
+      let totals;
+      try {
+        totals = calculateInvoice(subtotal, 0, invoiceDiscount);
+      } catch {
+        throw new ApiError(400, "Purchase discount cannot exceed subtotal");
+      }
+      for (const [productId, rows] of grouped) {
+        const quantity = totalQuantity(rows);
+        await tx.product.update({
+          where: { id: productId },
+          data: { currentStock: { increment: quantity } },
+        });
+      }
+      return tx.purchase.create({
+        data: {
+          purchaseNumber: `PUR-${Date.now()}-${randomUUID().slice(0, 8).toUpperCase()}`,
+          supplierId: input.supplierId,
+          supplierInvoiceNumber: input.supplierInvoiceNumber,
+          purchaseDate: input.purchaseDate ?? new Date(),
+          subtotal: totals.subtotal,
+          discountAmount: totals.discountAmount,
+          totalAmount: totals.total,
+          status: "POSTED",
+          items: { create: lines },
+        },
+        include: { items: true, payments: true },
+      });
+    },
+    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+  );
 }
 
 export async function cancelSale(id: string) {

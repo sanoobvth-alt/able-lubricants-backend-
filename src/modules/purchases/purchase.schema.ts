@@ -6,7 +6,6 @@ const purchaseLineSchema = z.object({
   supplierRate: z.coerce.number().finite().min(0).max(9999999999.99),
 });
 export const createPurchaseSchema = z.object({
-  idempotencyKey: z.string().trim().min(8).max(120),
   supplierId: z.uuid(),
   supplierInvoiceNumber: z.string().trim().max(100).optional(),
   purchaseDate: z.coerce.date().optional(),

@@ -1,9 +1,19 @@
 import { prisma } from "../../config/prisma.js";
 export const productModel = {
   list: (where: any, skip: number, take: number) =>
-    prisma.product.findMany({ where, skip, take, orderBy: { name: "asc" } }),
+    prisma.product.findMany({
+      where,
+      skip,
+      take,
+      orderBy: { name: "asc" },
+      include: { brand: true, unit: true },
+    }),
   count: (where: any) => prisma.product.count({ where }),
-  get: (id: string) => prisma.product.findUnique({ where: { id } }),
+  get: (id: string) =>
+    prisma.product.findUnique({
+      where: { id },
+      include: { brand: true, unit: true },
+    }),
 
   create: (data: any) => prisma.product.create({ data }),
   update: (id: string, data: any) =>

@@ -8,4 +8,9 @@ export const createCustomerSchema = z.object({
   active: z.boolean().optional(),
 });
 export const updateCustomerSchema = createCustomerSchema.partial();
-export const customerListSchema = paginationSchema.extend({});
+export const customerListSchema = paginationSchema.extend({
+  active: z
+    .enum(["true", "false"])
+    .transform((v) => v === "true")
+    .default(true),
+});

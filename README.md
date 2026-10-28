@@ -32,41 +32,44 @@ See `.env.example`. `ADMIN_PASSWORD` is required only when seeding the initial a
 
 All routes other than health and login require `Authorization: Bearer <token>`.
 
-| Method | Endpoint | Purpose |
-|---|---|---|
-| POST | `/api/v1/auth/login` | Get a JWT |
-| POST | `/api/v1/auth/users` | Admin-only staff/admin account creation |
-| GET, POST | `/api/v1/products` | Search/list and create products |
-| GET, PATCH | `/api/v1/products/:id` | Read/update product details; stock is never directly writable |
-| GET, POST, PATCH | `/api/v1/customers` | Manage customers |
-| GET, POST, PATCH | `/api/v1/suppliers` | Manage suppliers |
-| POST | `/api/v1/purchases` | Post purchase and increase stock atomically |
-| POST | `/api/v1/sales` | Post sale and decrease stock atomically |
-| POST | `/api/v1/customer-payments` | Record a cash/UPI payment against one invoice |
-| POST | `/api/v1/supplier-payments` | Record a supplier payment against one purchase |
-| POST | `/api/v1/sales/:id/cancel` | Admin-only cancellation and stock restoration |
-| POST | `/api/v1/purchases/:id/cancel` | Admin-only cancellation and stock reversal |
-| GET, POST, PATCH | `/api/v1/expenses` | List, create and update expenses |
-| GET | `/api/v1/reports/sales?from=...&to=...` | Daily sales totals and date-range totals |
-| GET | `/api/v1/reports/purchases?from=...&to=...` | Purchase report |
-| GET | `/api/v1/reports/expenses?from=...&to=...` | Expense report |
-| GET | `/api/v1/reports/customers/outstanding` | Customer invoice balances |
-| GET | `/api/v1/reports/suppliers/outstanding` | Supplier purchase balances |
-| GET | `/api/v1/reports/monthly?from=...&to=...` | Monthly sales, purchases and expenses |
+| Method           | Endpoint                                    | Purpose                                                       |
+| ---------------- | ------------------------------------------- | ------------------------------------------------------------- |
+| POST             | `/api/v1/auth/login`                        | Get a JWT                                                     |
+| POST             | `/api/v1/auth/users`                        | Admin-only staff/admin account creation                       |
+| GET, POST        | `/api/v1/products`                          | Search/list and create products                               |
+| GET, PATCH       | `/api/v1/products/:id`                      | Read/update product details; stock is never directly writable |
+| GET, POST, PATCH | `/api/v1/brands`                            | Manage product brands                                         |
+| GET, POST, PATCH | `/api/v1/units`                             | Manage selectable product units                               |
+| GET, POST        | `/api/v1/stock-adjustments`                 | View stock movement history and create admin-only adjustments |
+| GET, POST, PATCH | `/api/v1/customers`                         | Manage customers                                              |
+| GET, POST, PATCH | `/api/v1/suppliers`                         | Manage suppliers                                              |
+| POST             | `/api/v1/purchases`                         | Post purchase and increase stock atomically                   |
+| POST             | `/api/v1/sales`                             | Post sale and decrease stock atomically                       |
+| POST             | `/api/v1/customer-payments`                 | Record a cash/UPI payment against one invoice                 |
+| POST             | `/api/v1/supplier-payments`                 | Record a supplier payment against one purchase                |
+| POST             | `/api/v1/sales/:id/cancel`                  | Admin-only cancellation and stock restoration                 |
+| POST             | `/api/v1/purchases/:id/cancel`              | Admin-only cancellation and stock reversal                    |
+| GET, POST, PATCH | `/api/v1/expenses`                          | List, create and update expenses                              |
+| GET              | `/api/v1/reports/sales?from=...&to=...`     | Daily sales totals and date-range totals                      |
+| GET              | `/api/v1/reports/purchases?from=...&to=...` | Purchase report                                               |
+| GET              | `/api/v1/reports/expenses?from=...&to=...`  | Expense report                                                |
+| GET              | `/api/v1/reports/customers/outstanding`     | Customer invoice balances                                     |
+| GET              | `/api/v1/reports/suppliers/outstanding`     | Supplier purchase balances                                    |
+| GET              | `/api/v1/reports/monthly?from=...&to=...`   | Monthly sales, purchases and expenses                         |
 
-Requests that post sales/purchases require a unique `idempotencyKey` in the JSON body; repeat submissions with the same key return the original invoice. A sale's products, prices and totals come from the database/server calculation. Customer/supplier payments must be linked to one invoice and may not exceed its remaining amount. Cash and UPI are recorded as actual payments; an unpaid invoice is credit. A sale without a customer can still receive a payment linked to its invoice.
+Sales and purchase requests do not use an idempotency key. A retried request can create a second invoice and change stock again, so check the transaction result before resending after a timeout. Sale products, prices and totals are calculated by the server. Customer/supplier payments must be linked to one invoice and may not exceed its remaining amount. Cash and UPI are recorded as actual payments; an unpaid invoice is credit. A sale without a customer can still receive a payment linked to its invoice.
 
-List endpoints support `page`, `limit` (maximum 100), and `search`. Dates are ISO 8601. Monetary and quantity values are returned as decimal strings where applicable.
+List endpoints support `page`, `limit` (maximum 100), and `search`. Lists of products, brands, units, customers, and suppliers default to `active=true`; pass `active=false` to retrieve inactive records. Ledger and report endpoints retain historical records. Dates are ISO 8601. Monetary and quantity values are returned as decimal strings where applicable.
 
 ## Business-rule defaults and limits
 
-- Units are stored as text on Product; no dynamic Unit table is used.
+- Products reference managed Brand and Unit records. New product creation accepts `qty` for opening stock; later stock changes use stock adjustments.
 - Tax is omitted until tax treatment/rates are confirmed.
 - Purchase `our rate` is omitted until its meaning is defined.
 - Sale cost snapshot is nullable. No gross/net profit figures are reported until the costing method is agreed.
 - Customer/supplier advances and overpayments are rejected; payment allocation across invoices is not supported.
 - Cancellation restores stock only once by changing the posted record's state within the same transaction. A sale/purchase with linked payments cannot be cancelled through this API; payment reversal/refund handling must be defined before paid invoices can be reversed.
-- Product stock can only change through posted purchase/sale workflows; no stock-adjustment endpoint exists.
+- Product stock changes through opening quantity on product creation, posted purchase/sale workflows, and admin stock adjustments. All are recorded transactionally; manual adjustment history is available through `/api/v1/stock-adjustments`.
 - All inventory quantities use three decimal places. Change this after confirming packaging/unit precision.
 - Reports group dates in `Asia/Kolkata`; `from` and `to` are inclusive ISO date/time instants. Supply explicit time offsets when the reporting window is local business time.
 
@@ -78,4 +81,4 @@ Run `npm test` for focused tests around decimal line/invoice calculations and st
 
 ## Postman smoke tests
 
-Import `postman/Able-Lubes-API.postman_collection.json` into Postman. Set its `adminPassword` collection variable to the same value as `ADMIN_PASSWORD` in `.env`, run `npm run db:seed`, start the API, and run the collection from top to bottom with Collection Runner. It covers every current API route, including GET/POST/PATCH for CRUD-capable resources, invoice/payment flows, cancellation, and reports. It creates dummy customer, supplier, product, purchase, sale, payment, and expense data; it also checks idempotent retries and oversell rejection. Product/customer/supplier delete behavior is tested as soft deactivation with `PATCH active=false`. The API does not expose hard DELETE or PUT, nor sale/purchase reads or expense detail. Running the collection more than once creates additional dummy records.
+Import `postman/Able-Lubes-API.postman_collection.json` into Postman. Set its `adminPassword` collection variable to the same value as `ADMIN_PASSWORD` in `.env`, run `npm run db:seed`, start the API, and run the collection from top to bottom with Collection Runner. It covers every current API route, including GET/POST/PATCH for CRUD-capable resources, invoice/payment flows, cancellation, and reports. It creates dummy customer, supplier, product, purchase, sale, payment, and expense data; it also checks oversell rejection. Product/customer/supplier delete behavior is tested as soft deactivation with `PATCH active=false`. The API does not expose hard DELETE or PUT, nor sale/purchase reads or expense detail. Running the collection more than once creates additional dummy records.

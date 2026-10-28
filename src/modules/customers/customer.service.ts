@@ -3,14 +3,17 @@ import { pageMeta } from "../../shared/pagination.js";
 import { customerModel } from "./customer.model.js";
 import { customerSerializer } from "./customer.serializer.js";
 export async function listCustomers(q: any) {
-  const where = q.search
-    ? {
-        OR: [
-          { name: { contains: q.search, mode: "insensitive" } },
-          { phone: { contains: q.search } },
-        ],
-      }
-    : {};
+  const where = {
+    active: q.active,
+    ...(q.search
+      ? {
+          OR: [
+            { name: { contains: q.search, mode: "insensitive" } },
+            { phone: { contains: q.search } },
+          ],
+        }
+      : {}),
+  };
   const [data, total] = await Promise.all([
     customerModel.list(where, (q.page - 1) * q.limit, q.limit),
     customerModel.count(where),

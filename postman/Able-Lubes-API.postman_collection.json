@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "a8ad0e1c-8ec8-49ad-a313-72c9a89d4b50",
     "name": "Able Lubes Inventory & Billing API",
-    "description": "Postman collection generated from the actual Express route definitions in src/routes/v1.ts and each module route file. Includes every currently implemented endpoint and sample CRUD requests where supported. It explicitly documents unavailable hard-delete, PUT, and financial-record CRUD routes instead of sending requests that the API cannot handle. Set adminPassword to ADMIN_PASSWORD from .env; seed the admin, start the API, then run folders in order.",
+    "description": "Postman collection generated from the Express route definitions in src/routes/v1.ts and the feature route files. It includes each currently implemented endpoint and CRUD requests where supported. Sales and purchases do not use a request deduplication key, so retrying after a timeout can create another transaction. Unsupported hard DELETE, PUT, and invoice-read routes are documented instead of represented as working requests. Set adminPassword to ADMIN_PASSWORD from .env, seed the admin, start the API, then run folders in order.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -68,16 +68,6 @@
       "type": "string"
     },
     {
-      "key": "purchaseKey",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "saleKey",
-      "value": "",
-      "type": "string"
-    },
-    {
       "key": "runTag",
       "value": "",
       "type": "string"
@@ -104,11 +94,6 @@
     },
     {
       "key": "unpaidPurchaseId",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "unpaidPurchaseKey",
       "value": "",
       "type": "string"
     },
@@ -569,20 +554,11 @@
     },
     {
       "name": "5. Purchases",
-      "description": "POST creates/posts purchases and idempotent retry returns the original. POST /:id/cancel reverses stock for unpaid purchases. No purchase read or update route exists.",
+      "description": "POST creates and posts purchases; POST /:id/cancel reverses stock for an unpaid purchase. There are no purchase read or update routes.",
       "item": [
         {
           "name": "Post purchase (adds 100 L to stock)",
           "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.collectionVariables.set('purchaseKey', 'postman-purchase-' + Date.now());"
-                ]
-              }
-            },
             {
               "listen": "test",
               "script": {
@@ -604,40 +580,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"idempotencyKey\": \"{{purchaseKey}}\",\n  \"supplierId\": \"{{supplierId}}\",\n  \"supplierInvoiceNumber\": \"SUP-DUMMY-001\",\n  \"discountAmount\": 0,\n  \"items\": [\n    { \"productId\": \"{{productId}}\", \"quantity\": 100, \"supplierRate\": 600 }\n  ]\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": "{{baseUrl}}/purchases"
-          }
-        },
-        {
-          "name": "Repeat purchase with the same idempotency key (must not add stock twice)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Idempotent retry returns the original purchase', function () { pm.response.to.have.status(201); pm.expect(pm.response.json().data.id).to.eql(pm.collectionVariables.get('purchaseId')); });"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"idempotencyKey\": \"{{purchaseKey}}\",\n  \"supplierId\": \"{{supplierId}}\",\n  \"supplierInvoiceNumber\": \"SUP-DUMMY-001\",\n  \"discountAmount\": 0,\n  \"items\": [\n    { \"productId\": \"{{productId}}\", \"quantity\": 100, \"supplierRate\": 600 }\n  ]\n}",
+              "raw": "{\n  \"supplierId\": \"{{supplierId}}\",\n  \"supplierInvoiceNumber\": \"SUP-DUMMY-001\",\n  \"discountAmount\": 0,\n  \"items\": [\n    {\n      \"productId\": \"{{productId}}\",\n      \"quantity\": 100,\n      \"supplierRate\": 600\n    }\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -660,7 +603,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"idempotencyKey\": \"{{unpaidPurchaseKey}}\",\n  \"supplierId\": \"{{supplierId}}\",\n  \"supplierInvoiceNumber\": \"SUP-DUMMY-CANCEL\",\n  \"discountAmount\": 0,\n  \"items\": [\n    {\n      \"productId\": \"{{productId}}\",\n      \"quantity\": 5,\n      \"supplierRate\": 600\n    }\n  ]\n}",
+              "raw": "{\n  \"supplierId\": \"{{supplierId}}\",\n  \"supplierInvoiceNumber\": \"SUP-DUMMY-CANCEL\",\n  \"discountAmount\": 0,\n  \"items\": [\n    {\n      \"productId\": \"{{productId}}\",\n      \"quantity\": 5,\n      \"supplierRate\": 600\n    }\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -669,15 +612,6 @@
             }
           },
           "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.collectionVariables.set('unpaidPurchaseKey', 'postman-cancel-purchase-' + Date.now());"
-                ]
-              }
-            },
             {
               "listen": "test",
               "script": {
@@ -712,7 +646,7 @@
     },
     {
       "name": "6. Sales",
-      "description": "POST creates/posts sales and idempotent retry returns the original. POST /:id/cancel reverses stock for unpaid sales. Includes oversell rejection. No sale read or update route exists.",
+      "description": "POST creates and posts sales; POST /:id/cancel reverses stock for an unpaid sale. Includes an oversell rejection scenario. There are no sale read or update routes.",
       "item": [
         {
           "name": "Reject a sale larger than available stock",
@@ -737,7 +671,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"idempotencyKey\": \"oversell-{{$timestamp}}\",\n  \"customerId\": \"{{customerId}}\",\n  \"items\": [\n    { \"productId\": \"{{productId}}\", \"quantity\": 999999, \"discountAmount\": 0 }\n  ]\n}",
+              "raw": "{\n  \"customerId\": \"{{customerId}}\",\n  \"items\": [\n    {\n      \"productId\": \"{{productId}}\",\n      \"quantity\": 999999,\n      \"discountAmount\": 0\n    }\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -750,15 +684,6 @@
         {
           "name": "Post a credit sale (2 L with a 25 discount)",
           "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.collectionVariables.set('saleKey', 'postman-sale-' + Date.now());"
-                ]
-              }
-            },
             {
               "listen": "test",
               "script": {
@@ -780,40 +705,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"idempotencyKey\": \"{{saleKey}}\",\n  \"customerId\": \"{{customerId}}\",\n  \"discountAmount\": 0,\n  \"items\": [\n    { \"productId\": \"{{productId}}\", \"quantity\": 2, \"discountAmount\": 25 }\n  ]\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": "{{baseUrl}}/sales"
-          }
-        },
-        {
-          "name": "Repeat sale with the same idempotency key (must not deduct stock twice)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Idempotent retry returns the original sale', function () { pm.response.to.have.status(201); pm.expect(pm.response.json().data.id).to.eql(pm.collectionVariables.get('saleId')); });"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"idempotencyKey\": \"{{saleKey}}\",\n  \"customerId\": \"{{customerId}}\",\n  \"discountAmount\": 0,\n  \"items\": [\n    { \"productId\": \"{{productId}}\", \"quantity\": 2, \"discountAmount\": 25 }\n  ]\n}",
+              "raw": "{\n  \"customerId\": \"{{customerId}}\",\n  \"discountAmount\": 0,\n  \"items\": [\n    {\n      \"productId\": \"{{productId}}\",\n      \"quantity\": 2,\n      \"discountAmount\": 25\n    }\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -826,15 +718,6 @@
         {
           "name": "Post an unpaid walk-in sale for cancellation test",
           "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.collectionVariables.set('unpaidSaleKey', 'postman-cancel-sale-' + Date.now());"
-                ]
-              }
-            },
             {
               "listen": "test",
               "script": {
@@ -856,7 +739,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"idempotencyKey\": \"{{unpaidSaleKey}}\",\n  \"items\": [\n    { \"productId\": \"{{productId}}\", \"quantity\": 1, \"discountAmount\": 0 }\n  ]\n}",
+              "raw": "{\n  \"items\": [\n    {\n      \"productId\": \"{{productId}}\",\n      \"quantity\": 1,\n      \"discountAmount\": 0\n    }\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"
