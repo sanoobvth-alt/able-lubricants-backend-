@@ -12,7 +12,7 @@
     "resolveJsonModule": true,
     "types": ["node"],
     "allowImportingTsExtensions": true,
-    "noEmit": true
+    "noEmit": false
   },
   "include": ["src/**/*.ts", "prisma/seed.ts", "generated/**/*.ts"],
   "exclude": ["node_modules", "dist"]
